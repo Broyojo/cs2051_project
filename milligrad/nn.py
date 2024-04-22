@@ -19,6 +19,8 @@ class Neuron:
             return value.relu()
         elif self.activation == "sigmoid":
             return value.sigmoid()
+        elif self.activation == "linear":
+            return value
         else:
             assert False, f"Invalid activation {self.activation}"
 

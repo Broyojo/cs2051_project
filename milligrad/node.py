@@ -38,6 +38,12 @@ class Node:
     def __rpow__(self, other):
         return Pow.apply(other, self)
 
+    def __truediv__(self, other):
+        return Div.apply(self, other)
+
+    def __rtruediv__(self, other):
+        return Div.apply(other, self)
+
     def sigmoid(self):
         return Sigmoid.apply(Sigmoid, self)
 
@@ -62,19 +68,22 @@ class Node:
         return list
 
     def backward(self, seed=1):
+        sorted_nodes = self.topological_sort()
         self.grad = seed
 
-        for node in reversed(self.topological_sort()):
+        for node in reversed(sorted_nodes):
             if node.op:
                 node.op.backward()
 
     def zero_grad(self):
-        for node in reversed(self.topological_sort()):
+        sorted_nodes = self.topological_sort()
+        for node in reversed(sorted_nodes):
             node.grad = 0
 
     def step(self, learning_rate):
-        for nodes in reversed(self.topological_sort()):
-            nodes.value -= self.grad * learning_rate
+        sorted_nodes = self.topological_sort()
+        for node in reversed(sorted_nodes):
+            node.value -= node.grad * learning_rate
 
     def __repr__(self):
         return f"Node(value={self.value}, op={self.op.__class__.__name__ if self.op else None}, grad={self.grad}, parents={self.parents})"
@@ -164,7 +173,7 @@ class Pow(BinaryOp):
 
     def backward(self):
         self.a.grad += self.b.value * self.a.value ** (self.b.value - 1) * self.c.grad
-        # self.b.grad += self.c.value * math.log(self.a.value) * self.c.grad
+        self.b.grad += self.c.value * math.log(self.a.value) * self.c.grad
 
 
 class Neg(UnaryOp):
@@ -199,9 +208,22 @@ class Log(UnaryOp):
         try:
             self.b = Node(math.log(self.a.value + 1e-10), self, parents=[self.a])
         except:
-            print(self.a.value)
+            print("invalid value:", self.a.value)
             quit()
         return self.b
 
     def backward(self):
-        self.a.grad += (1 / self.b.value) * self.b.grad
+        self.a.grad += (1 / (self.a.value + 1e-10)) * self.b.grad
+
+
+class Div(BinaryOp):
+    def forward(self):
+        self.c = Node(self.a.value / self.b.value, op=self, parents=[self.a, self.b])
+        return self.c
+
+    def backward(self):
+        self.a.grad += (1 / self.b.value) * self.c.grad
+        try:
+            self.b.grad += (-self.a.value / (self.b.value**2)) * self.c.grad
+        except:
+            pass
